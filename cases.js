@@ -67,7 +67,7 @@ const RACE_EDGES = [
  {f:0,t:1,type:"seq"},{f:1,t:2,type:"branch"},{f:2,t:3,type:"seq"},{f:3,t:4,type:"seq"},
  {f:4,t:5,type:"backtrack"},{f:5,t:6,type:"seq"},{f:6,t:7,type:"seq"},{f:7,t:8,type:"seq"},
  {f:8,t:9,type:"seq"},{f:9,t:10,type:"seq"},{f:10,t:11,type:"seq"},{f:11,t:12,type:"seq"},
- {f:12,t:13,type:"seq"},{f:1,t:5,type:"shortcut"},
+ {f:12,t:13,type:"seq"},{f:13,t:14,type:"seq"},{f:1,t:5,type:"shortcut"},
 ];
 
 /* ---- Case 2: a straight hunt (an error that names the gap) ---- */
@@ -78,7 +78,7 @@ const CFG_STEPS = [
   narr:`The first move is to stop hiding the error: run it in the foreground and read stderr. It says exactly what is wrong — <code>config.yaml:12: unknown key "timout"</code>.`},
  {chapter:"See the real error",kind:"win",move:"Localize from the message",lane:0,title:"The message names it",
   narr:`That message is a gift: it names the file, the line, and the offending key. There is nothing to search for — the program has already localized the bug for me.`},
- {chapter:"Look it up",kind:"win",move:"Read the line",lane:0,title:"Line 12 has a typo",
+ {chapter:"Look it up",kind:"win",move:"Localize from the message",lane:0,title:"Line 12 has a typo",
   narr:`Open <code>config.yaml</code> at line 12: <code>timout: 30</code>. A single missing <code>e</code> — it should be <code>timeout</code>.`},
  {chapter:"The root cause",kind:"root",move:"Find the gap",lane:0,title:"Strict schema, unknown key",
   narr:`The loader validates against a schema that only knows <code>timeout</code>, and it runs in strict mode, so an unknown key is a hard error. The typo simply isn't a key it recognizes.`},
@@ -107,3 +107,22 @@ window.CASES = {
  config:{name:"The config typo", sub:"An error that named the gap — a near-straight descent.",
    steps:CFG_STEPS, code:CFG_CODE, edges:CFG_EDGES, audio:/*AUDIO_config_START*/null/*AUDIO_config_END*/},
 };
+
+/* ---- Clusters (optional) --------------------------------------------------
+ * Group hunts by WHAT PRODUCED THE DECISIVE EVIDENCE — that is what dictates
+ * the shape of the graph, and so what the case can teach. The player renders
+ * one labelled chip-group per cluster; drop this and the selector is a plain
+ * flat row. See docs/moves.md ("Clusters") and docs/authoring.md.
+ * ------------------------------------------------------------------------ */
+window.CASE_GROUPS = [
+  {id:"noname", name:"Symptom names nothing",
+   blurb:"The failure carries no information, so the hunt must first manufacture a "+
+         "signal by removing noise. Shape: tangled — hypothesis, dead end, backtrack, "+
+         "then the real descent. Decisive move: Control your variables.",
+   cases:["race"]},
+  {id:"named", name:"The error names the gap",
+   blurb:"The failure names a file, a line, a missing thing. The work is to read it "+
+         "rather than investigate around it. Shape: near-straight. Decisive moves: "+
+         "Un-hide the error, Localize from the message.",
+   cases:["config"]},
+];

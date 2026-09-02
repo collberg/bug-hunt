@@ -20,6 +20,27 @@ window.CASES = {
 };
 ```
 
+### Clusters (optional)
+
+Set `window.CASE_GROUPS` to render the selector as labelled groups instead of
+one flat row. Group hunts by **what produced the decisive evidence** — that is
+what dictates the shape of the graph, and so what the case can teach (see
+[`moves.md`](moves.md), "Clusters").
+
+```js
+window.CASE_GROUPS = [
+  {id:"named",                       // stable id (used for the active highlight)
+   name:"The error names the gap",   // the little uppercase label
+   blurb:"...",                      // tooltip on the label and on the header pill
+   cases:["race","config"]},         // case ids, in the order to show them
+];
+```
+
+A case may appear in **one** group at most. Cases in no group are appended,
+unlabelled, at the end. Omit `CASE_GROUPS` entirely and the selector looks
+exactly as it did before. The selected case's group name also shows as a pill
+next to the page title, with the blurb as its tooltip.
+
 ### A step
 
 ```js
@@ -94,3 +115,15 @@ If you captured a debugging session as JSON-lines (reasoning + tool calls),
 one step per reasoning/action beat, with `kind`/`lane`/`move`/`edges` left for
 you to fill in. It does the transcription; you do the judgement (which beats were
 dead ends, what the lesson was).
+
+## Check it before you ship it
+
+```
+node scripts/validate-cases.js cases.js docs/moves.md
+```
+
+Verifies what the player assumes but never checks at runtime — `code[]` the same
+length as `steps[]`, edge endpoints in range, known `kind`/`lane`/edge types,
+every step tagged with a move, `CASE_GROUPS` referencing real cases with no
+duplicates, and (when given a `moves.md`) that every move used is documented
+there. Exits non-zero on error, so it can gate a commit.

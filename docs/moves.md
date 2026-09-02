@@ -28,16 +28,42 @@ compiler crash, or a failing deploy equally.
 | **Localize from the message** | Let a precise error name the file/line/thing. | When the program tells you what's wrong, read it — don't investigate. |
 | **Fix + lock** | Fix the mechanism, then add a test that fails-before / passes-after. | Makes the fix a fact, not a hope; stops silent regressions. |
 | **Lesson** | The retrospective: the one move you'd start with next time. | This is what the student actually takes away. |
+| **Bring a better oracle** | Run a test you did not write — a conformance suite, someone else's corpus. | Your own tests encode the same assumptions as your bug. |
+| **Audit the invariant** | State what the code must always keep true, then check the code against that sentence. | The only way to reach a bug whose output is still correct. |
+| **Check upstream first** | Before patching vendored/third-party code, look whether upstream already fixed it. | Cheaper than reinventing, and stops you diverging from a fix that exists. |
+| **Narrow the fix** | Condition the change on exactly the case that is broken. | A fix that cannot reach the common path cannot regress it. |
+| **Strengthen the repro** | Make the test assert the *behaviour*, not just that the thing no longer errors. | "It parses now" would pass even if you mapped it to the wrong meaning. |
+| **Fence the scope** | When the hunt turns up a *second* bug, name it and leave it. | A patch that quietly grows is a patch nobody can verify. |
+| **Bisect (misapplied)** | Bisecting before the comparison is stable. | The classic trap: it returns a confident, wrong answer. |
+| **Trace to the origin** | Walk a value back to the code that first constructs it. | Where it is *born* is where the fix belongs. |
+| **Find the gap** | Name the missing case precisely — the type with no home, the keyword with no token. | Turns "it's broken" into a one-line change. |
 
-## The two shapes to contrast
 
-- **A symptom that names nothing** (a segfault, an intermittent 500) tends to
-  produce a *tangled* graph: a tempting hypothesis, a dead-end detour, a
-  backtrack, then the real descent. The expert shortcut is usually **Control
-  your variables**, made first.
-- **An error that names the gap** (a strict-schema rejection, a "field not
-  found") tends to produce a *straight* graph: **Un-hide the error → Localize →
-  fix.** Almost no dead ends.
+## Clusters — group hunts by what produced the decisive evidence
+
+One graph illustrates a hunt; the insight is in the **diff between graphs**. The
+most useful axis to group them on is not the kind of bug (a race, a typo, a
+parser gap) but **what handed you the evidence that cracked it** — because that
+is what dictates the shape of the graph, and therefore what the case can teach.
+
+| Cluster | The failure gives you | Typical shape | Decisive move |
+|---|---|---|---|
+| **Symptom names nothing** | A bare crash, an intermittent error — no information | **Tangled**: tempting hypothesis → dead-end detour → backtrack → real descent | *Control your variables* |
+| **The error names the gap** | A file, a line, a missing thing | **Near-straight**: read it, localize, fix | *Un-hide the error*, *Localize from the message* |
+| **An outside oracle found it** | Nothing of your own — someone else's test failed | **Straight**, and ends by widening the net that caught it | *Bring a better oracle* |
+| **No symptom at all** | Nothing; the program is behaving correctly | **Short**, no dead ends, nothing to react to | *Audit the invariant* |
+
+The first two are opposites and make the sharpest pair to show side by side: a
+symptom that names nothing produces dead ends and a backtrack, while an error
+that names the gap collapses to an errand. The third is the reminder that most
+of your blind spots are only visible through a test you did not write. The
+fourth is the one people forget exists — a bug with correct output, reachable
+only by naming the invariant it violates.
+
+A player can render these as labelled groups; see `docs/authoring.md`
+(`window.CASE_GROUPS`).
+
+## The novice/expert contrast
 
 Teaching insight: compare a novice traversal to an expert traversal of the
 *same* bug. The expert's graph is shorter because they front-load one or two

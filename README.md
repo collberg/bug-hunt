@@ -28,6 +28,12 @@ Controls: **Play/Pause**, **Prev/Next**, **Restart**, speed, and **Narrate
 aloud** (uses the browser's built-in speech, or pre-rendered audio if present).
 Keyboard: space / ← / → / R. Deep-link a step with `#<case>-<step>` in the URL.
 
+Once you have more than a handful of hunts, group them: set
+`window.CASE_GROUPS` and the selector renders labelled **clusters** instead of
+one flat row, with the active cluster shown as a pill beside the title. Cluster
+hunts by *what produced the decisive evidence* — see
+[`docs/moves.md`](docs/moves.md).
+
 The point is **contrast**: put a tangled hunt next to a straight one and the
 lesson — *what made the difference* — falls out of the shape.
 
@@ -45,6 +51,10 @@ matching entry in `code[]`, and `edges[]` wires the graph
 
 - `scripts/extract-graph.py` turns a captured session log (JSON-lines of
   reasoning + actions) into a `cases.js` **skeleton** you then tag and prose up.
+- `scripts/validate-cases.js` checks a finished `cases.js` against the
+  invariants the player assumes but never verifies at runtime (`code[]` aligned
+  with `steps[]`, edge endpoints in range, every step tagged with a documented
+  move, groups referencing real cases). Exits non-zero, so it can gate a commit.
 - `scripts/render-narration.sh` (macOS + [Piper](https://github.com/rhasspy/piper))
   renders natural speech per step and embeds it — optional; the browser voice
   works everywhere with zero setup.
@@ -57,8 +67,8 @@ One graph *illustrates* a hunt; the insight is in the **diff between graphs**.
 Tag every step with a move from a small shared vocabulary and you can compare
 hunts structurally: which moves appear, in what order, where the dead ends
 cluster, how a novice path differs from the expert one. The demo ships two cases
-with deliberately opposite shapes — a tangle and a straight line — to show what
-that comparison looks like.
+with deliberately opposite shapes — a tangle and a straight line — in their two
+clusters, to show what that comparison looks like.
 
 ## License
 

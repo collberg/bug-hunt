@@ -18,13 +18,29 @@
     font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     display:flex;flex-direction:column;height:100vh;overflow:hidden}
   header{padding:14px 24px 12px;border-bottom:1px solid var(--line);
-    display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    /* opaque: on narrow screens the header is sticky over a scrolling page,
+       and a transparent one lets the timeline show through it */
+    background:var(--bg)}
   header h1{font-size:19px;margin:0;letter-spacing:.2px}
   header .sub{color:var(--muted);font-size:13px;flex:1;min-width:180px}
-  .cases{display:flex;gap:6px;flex-wrap:wrap}
+  .cases{display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center}
   .cases button{font:inherit;font-size:12.5px;color:var(--muted);background:var(--panel2);
     border:1px solid var(--line);border-radius:20px;padding:5px 13px;cursor:pointer}
   .cases button.on{color:var(--ink);border-color:#3a496e;background:#23304c;font-weight:600}
+  /* a cluster of cases that share a debugging technique */
+  .cases .grp{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 4px;
+    border:1px dashed var(--line);border-radius:22px;
+    flex-wrap:wrap;max-width:100%;min-width:0}
+  .cases .grp>.glab{font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;
+    color:var(--muted);opacity:.85;padding:0 4px 0 6px;cursor:help;white-space:nowrap;
+    max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .cases .grp.active{border-color:#3a496e;background:#1b2540}
+  .cases .grp.active>.glab{color:var(--ink);opacity:1}
+  header .cluster{font-size:11px;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--muted);border:1px solid var(--line);border-radius:20px;
+    padding:3px 10px;white-space:nowrap;cursor:help}
+  header .cluster:empty{display:none}
   main{flex:1;display:grid;grid-template-columns:minmax(340px,1fr) minmax(360px,1.02fr);min-height:0}
   .timeline{overflow-y:auto;padding:0 20px 40vh 8px;position:relative}
   #edges{position:absolute;top:0;left:0;pointer-events:none;z-index:0;overflow:visible}
@@ -110,12 +126,22 @@
     .stage h2{font-size:20px}.narr{font-size:15px;max-width:none}
     .code{height:150px}
     footer{position:sticky;bottom:0;z-index:10}
+    /* the pill just repeats the highlighted group chip; the header is tight here */
+    header .cluster{display:none}
+    header .sub{flex-basis:100%}
+    /* give the selector the full row, and let each cluster label sit on its own
+       line above its chips — label + a long chip does not fit side by side */
+    .cases{flex-basis:100%;width:100%}
+    .cases .grp{width:100%}
+    .cases .grp>.glab{flex-basis:100%;padding-bottom:2px}
+    .cases button{max-width:100%}
   }
 </style>
 </head>
 <body>
   <header>
     <h1 id="apptitle">Bug Hunt</h1>
+    <span class="cluster" id="cluster"></span>
     <span class="sub" id="subtitle">—</span>
     <div class="cases" id="cases"></div>
   </header>
@@ -188,12 +214,34 @@ if(!CASE_IDS.length){
 function runEngine(){
 let state={cid:CASE_IDS[0],cur:-1}, nodeEls=[], playing=false, timer=null, curUtter=null, audioEl=null;
 
-CASE_IDS.forEach(cid=>{
+/* ---- selector, optionally clustered by technique -----------------------------
+   window.CASE_GROUPS = [{id, name, blurb, cases:[caseId,...]}, ...]
+   Cases not listed in any group are appended, unlabelled, at the end. With no
+   CASE_GROUPS at all the selector is a plain flat row (the original layout). */
+const GROUPS=(window.CASE_GROUPS||[]).filter(g=>g&&Array.isArray(g.cases));
+const GROUP_OF={};
+GROUPS.forEach(g=>g.cases.forEach(cid=>{ if(CASES[cid]) GROUP_OF[cid]=g; }));
+const UNGROUPED=CASE_IDS.filter(cid=>!GROUP_OF[cid]);
+
+function mkCaseBtn(cid){
   const b=document.createElement("button");
   b.textContent=CASES[cid].name||cid; b.dataset.cid=cid;
   b.onclick=()=>{ location.hash=cid+"-1"; };
-  $("cases").appendChild(b);
+  return b;
+}
+GROUPS.forEach(g=>{
+  const ids=g.cases.filter(cid=>CASES[cid]);
+  if(!ids.length) return;
+  const wrap=document.createElement("div");
+  wrap.className="grp"; wrap.dataset.gid=g.id||g.name||"";
+  const lab=document.createElement("span");
+  lab.className="glab"; lab.textContent=g.name||g.id||"";
+  if(g.blurb) lab.title=g.blurb;
+  wrap.appendChild(lab);
+  ids.forEach(cid=>wrap.appendChild(mkCaseBtn(cid)));
+  $("cases").appendChild(wrap);
 });
+UNGROUPED.forEach(cid=>$("cases").appendChild(mkCaseBtn(cid)));
 
 function buildTimeline(){
   const cs=CASES[state.cid];
@@ -284,7 +332,13 @@ function setPlaying(p){ playing=p; $("play").textContent=p?"⏸ Pause":"▶ Play
 function switchCase(cid){
   setPlaying(false); state.cid=cid; state.cur=-1;
   $("subtitle").textContent=CASES[cid].sub||"";
-  [...$("cases").children].forEach(b=>b.classList.toggle("on",b.dataset.cid===cid));
+  [...document.querySelectorAll("#cases button")].forEach(b=>b.classList.toggle("on",b.dataset.cid===cid));
+  const g=GROUP_OF[cid];
+  [...document.querySelectorAll("#cases .grp")].forEach(w=>
+    w.classList.toggle("active", !!g && w.dataset.gid===(g.id||g.name||"")));
+  const pill=$("cluster");
+  pill.textContent=g?(g.name||g.id||""):"";
+  pill.title=g&&g.blurb?g.blurb:"";
   buildTimeline(); render(0);
   requestAnimationFrame(()=>requestAnimationFrame(drawEdges));
 }
