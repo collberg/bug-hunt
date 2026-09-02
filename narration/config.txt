@@ -1,0 +1,7 @@
+The service exits non-zero at boot. Run under a process manager, all you see is that it died and got restarted. No reason given.
+The first move is to stop hiding the error: run it in the foreground and read standard error. It says exactly what is wrong: config dot yaml, line 12, unknown key, timout.
+That message is a gift: it names the file, the line, and the offending key. There is nothing to search for. The program has already localized the bug.
+Open config dot yaml at line 12: timout, thirty. A single missing e. It should be timeout.
+The loader validates against a schema that only knows timeout, and it runs in strict mode, so an unknown key is a hard error. The typo simply is not a key it recognizes.
+Correct the spelling. Then add a tiny test that loads the shipped config against the schema, so any future typo fails in continuous integration instead of at three in the morning.
+Contrast this with the intermittent 500. That one named nothing and took a tangled hunt. This one named the file, line, and key in the first real message, and the path was a straight line: un-hide, read, fix. When the program tells you what is wrong, read it.

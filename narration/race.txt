@@ -1,0 +1,15 @@
+An API endpoint returns HTTP 500, but only sometimes. The logs show the bare status code and nothing else. No stack trace, no pattern. That is all we start with.
+There was a deploy this morning, and the errors started today. So the first hypothesis writes itself: the deploy caused it. It feels obvious, which is exactly when a hypothesis deserves a test.
+I roll back release by release, watching the error rate, and one release looks guilty. Confirmed? Only if the comparison is fair, and I never checked that the two releases were tested under the same conditions.
+Each release was observed under whatever live traffic happened to be flowing. Load, concurrency, and data all differed between runs. The error rate I compared was measuring the weather, not the code.
+Along the way I found a slow database query and spent an hour on it. But it is exactly as slow on the healthy release. A thing that behaves identically in the good and the bad version cannot be the cause. Dead end.
+The way out was inside the dead end: kill the variability. I drive the endpoint with a fixed request, from a controlled harness, on demand, with no live traffic. Now a run means something. This is the hinge of the whole hunt.
+Under the controlled repro I hit the previous release, the one I had cleared. It throws the same 500. One observation, and the deploy theory is gone.
+My bisection was wrong; the bug is older than today's deploy. Throwing away that confirmed result is the most important move on the timeline. Only now does the real search begin.
+I vary one thing at a time. One request at a time never fails. Several at once fails often. The trigger is concurrency, not any particular input.
+I shrink it to the smallest thing that still breaks: two parallel requests to the same endpoint, in a loop. It fails within seconds, reliably. A mystery turned into an experiment.
+With the repro in hand I attach a debugger and add asserts. The failures land inside a shared in-memory cache: sometimes a missing entry, sometimes a corrupted one. The data structure is being torn.
+The cache is a plain hash map, written from every request thread with no lock. Two writers landing together during a resize is exactly what shreds it.
+The root cause is a data race: unsynchronized writes to a shared, non-thread-safe map. The 500 was just the debris. Fix the race, not the null check that hides it.
+The fix: swap the map for a thread-safe one, or guard it with a lock. Then a stress test, many parallel requests, fails before the fix and passes after.
+If I had known better, I would have built the controlled repro first. That one move would have shown the old release failing too, and pointed straight at concurrency. The whole red path collapses into it. Control your variables before you trust a single comparison.

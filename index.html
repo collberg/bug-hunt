@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bug Hunt</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#161d2e; --panel2:#1b2438; --ink:#e8edf7; --muted:#9aa7c2;
+    --line:#2a3450; --shadow:rgba(0,0,0,.4);
+    --evidence:#8aa0c8; --deadend:#e2606a; --pivot:#e6b84a; --win:#3fbf7f;
+    --root:#b98be6; --retro:#4fb8e0;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:radial-gradient(1200px 700px at 70% -10%, #1a2440, transparent),var(--bg);
+    background-color:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  header{padding:14px 24px 12px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  header h1{font-size:19px;margin:0;letter-spacing:.2px}
+  header .sub{color:var(--muted);font-size:13px;flex:1;min-width:180px}
+  .cases{display:flex;gap:6px;flex-wrap:wrap}
+  .cases button{font:inherit;font-size:12.5px;color:var(--muted);background:var(--panel2);
+    border:1px solid var(--line);border-radius:20px;padding:5px 13px;cursor:pointer}
+  .cases button.on{color:var(--ink);border-color:#3a496e;background:#23304c;font-weight:600}
+  main{flex:1;display:grid;grid-template-columns:minmax(340px,1fr) minmax(360px,1.02fr);min-height:0}
+  .timeline{overflow-y:auto;padding:0 20px 40vh 8px;position:relative}
+  #edges{position:absolute;top:0;left:0;pointer-events:none;z-index:0;overflow:visible}
+  .tl-legend{position:sticky;top:0;z-index:3;display:flex;gap:14px;flex-wrap:wrap;
+    padding:9px 6px 9px 12px;margin-bottom:6px;background:var(--bg);border-bottom:1px solid var(--line);
+    font-size:11px;color:var(--muted)}
+  .tl-legend span{display:flex;align-items:center;gap:5px}
+  .tl-legend i{width:16px;height:0;border-top:2px solid var(--line);display:inline-block}
+  .tl-legend i.dead{border-top-style:dashed;border-color:var(--deadend)}
+  .tl-legend i.back{border-color:var(--pivot);border-top-width:3px}
+  .tl-legend i.short{border-top-style:dotted;border-color:var(--retro)}
+  .tl-legend i.main{border-color:var(--win)}
+  .node{position:relative;z-index:1;padding:0 4px 0 46px;margin:0 0 14px;opacity:.14;
+    transform:translateY(6px);transition:opacity .5s ease,transform .5s ease}
+  .node.detour{margin-left:132px}
+  .node.on{opacity:1;transform:none}
+  .dot{position:absolute;left:16px;top:12px;width:14px;height:14px;border-radius:50%;
+    background:var(--panel2);border:2px solid currentColor;z-index:2}
+  .node.active .dot{animation:pulse 1.6s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.35)}
+    70%{box-shadow:0 0 0 10px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
+  .card{background:var(--panel);border:1px solid var(--line);border-left:3px solid currentColor;
+    border-radius:10px;padding:9px 13px;box-shadow:0 2px 10px var(--shadow)}
+  .node.active .card{background:var(--panel2);border-color:currentColor;
+    box-shadow:0 0 0 1px currentColor,0 6px 22px var(--shadow)}
+  .card .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:currentColor;font-weight:700;opacity:.9}
+  .card .t{font-size:14px;margin-top:1px;color:var(--ink)}
+  .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;padding:1px 7px;
+    border-radius:20px;margin-top:6px;border:1px solid currentColor;color:currentColor}
+  .kind-evidence{color:var(--evidence)} .kind-deadend{color:var(--deadend)}
+  .kind-pivot{color:var(--pivot)} .kind-win{color:var(--win)}
+  .kind-root{color:var(--root)} .kind-retro{color:var(--retro)}
+  .edge{fill:none;stroke:var(--line);stroke-width:2;stroke-opacity:.16;transition:stroke-opacity .4s}
+  .edge.lit{stroke-opacity:1}
+  .edge.k-evidence{stroke:var(--evidence)} .edge.k-deadend{stroke:var(--deadend)}
+  .edge.k-pivot{stroke:var(--pivot)} .edge.k-win{stroke:var(--win)}
+  .edge.k-root{stroke:var(--root)} .edge.k-retro{stroke:var(--retro)}
+  .edge.branch{stroke-dasharray:5 4}
+  .edge.backtrack{stroke:var(--pivot);stroke-width:2.6}
+  .edge.shortcut{stroke:var(--retro);stroke-dasharray:2 6;stroke-width:2}
+  .edge.shortcut.lit{stroke-opacity:.7}
+  .elabel{fill:var(--muted);font:10px ui-monospace,Menlo,monospace}
+  .elabel.short{fill:var(--retro)} .elabel.back{fill:var(--pivot)}
+  .stage{background:linear-gradient(180deg,var(--panel) 0%,#131a29 100%);border-left:1px solid var(--line);
+    padding:30px 34px;display:flex;flex-direction:column;min-height:0;position:relative}
+  .chapter{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700}
+  .counter{color:var(--muted);font-size:12px;margin-left:auto}
+  .stage .head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .movechip{align-self:flex-start;font-size:11px;color:var(--muted);border:1px solid var(--line);
+    border-radius:20px;padding:2px 10px;margin-bottom:14px}
+  .movechip b{color:var(--ink);font-weight:600}
+  .stage h2{font-size:25px;line-height:1.2;margin:0 0 15px;letter-spacing:.2px}
+  .narr{font-size:16.5px;line-height:1.7;color:#dfe6f4;max-width:52ch}
+  .narr code{background:#0c1220;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:14px;color:#cfe0ff}
+  .stage .accent{position:absolute;top:0;left:0;width:5px;height:100%;background:currentColor;opacity:.85}
+  .code{height:180px;border-top:1px solid var(--line);background:#0b1018;display:flex;flex-direction:column;min-height:0}
+  .code .bar{display:flex;align-items:center;gap:10px;padding:7px 18px;border-bottom:1px solid var(--line);
+    background:#0d1524;flex:0 0 auto}
+  .code .bar .lbl{font:11px/1 ui-monospace,Menlo,monospace;letter-spacing:.5px;color:currentColor;font-weight:700;text-transform:uppercase}
+  .code .bar .cap{color:var(--muted);font-size:12px}
+  .code pre{margin:0;overflow:auto;flex:1;padding:10px 18px;
+    font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#c6d4ee;white-space:pre;tab-size:2}
+  .code pre span{display:block}
+  .code pre .cmt{color:#6d7f9e}
+  .code pre .hl{background:rgba(226,96,106,.14);border-left:2px solid var(--deadend);margin:0 -18px;padding:0 18px 0 16px}
+  .code pre .ok{background:rgba(63,191,127,.13);border-left:2px solid var(--win);margin:0 -18px;padding:0 18px 0 16px}
+  .code .empty{color:var(--muted);font-style:italic;padding:14px 18px}
+  footer{border-top:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:14px;background:var(--panel);flex-wrap:wrap}
+  button{font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+  button:hover{background:#22304c;border-color:#3a496e}
+  button.play{background:#243b56;border-color:#39597f;font-weight:700;min-width:96px}
+  .prog{flex:1;height:6px;background:var(--line);border-radius:20px;overflow:hidden;min-width:120px}
+  .prog>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--win),var(--retro));transition:width .4s ease}
+  .ctl{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+  select{accent-color:var(--win)} .toggle{user-select:none}
+  .nomsg{padding:40px;color:var(--muted);max-width:60ch}
+  @media(max-width:860px){main{grid-template-columns:1fr;grid-template-rows:1fr 1fr}
+    .stage{border-left:none;border-top:1px solid var(--line)}.stage h2{font-size:20px}.narr{font-size:15px}}
+</style>
+</head>
+<body>
+  <header>
+    <h1 id="apptitle">Bug Hunt</h1>
+    <span class="sub" id="subtitle">—</span>
+    <div class="cases" id="cases"></div>
+  </header>
+  <main>
+    <div class="timeline" id="timeline">
+      <svg id="edges"></svg>
+      <div class="tl-legend">
+        <span><i class="main"></i>path</span>
+        <span><i class="dead"></i>dead&nbsp;end</span>
+        <span><i class="back"></i>backtrack</span>
+        <span><i class="short"></i>expert&nbsp;shortcut</span>
+      </div>
+    </div>
+    <section class="stage">
+      <span class="accent" id="accent"></span>
+      <div class="head"><span class="chapter" id="chapter">—</span><span class="counter" id="counter">1 / 1</span></div>
+      <span class="movechip" id="move"></span>
+      <h2 id="title">—</h2>
+      <div class="narr" id="narr">—</div>
+    </section>
+  </main>
+  <div class="code" id="code">
+    <div class="bar"><span class="lbl" id="codelbl">—</span><span class="cap" id="codecap"></span></div>
+    <pre id="codebody"></pre>
+  </div>
+  <footer>
+    <button id="restart" title="Restart (R)">⟲ Restart</button>
+    <button id="prev" title="Previous (←)">◀ Prev</button>
+    <button id="play" class="play" title="Play / Pause (Space)">▶ Play</button>
+    <button id="next" title="Next (→)">Next ▶</button>
+    <label class="ctl toggle"><input type="checkbox" id="speak"> 🔊 Narrate aloud</label>
+    <label class="ctl">Speed
+      <select id="speed"><option value="1.4">Slow</option><option value="1" selected>Normal</option><option value="0.6">Fast</option></select>
+    </label>
+    <div class="prog"><i id="fill"></i></div>
+  </footer>
+
+<!-- helpers used by case data files ------------------------------------------------ -->
+<script>
+  // Line builders for the bottom code panel. Use in a case's `code` arrays:
+  //   P("plain")  C("comment")  H("highlight: the problem")  K("highlight: the fix/good path")
+  window.P=s=>s;
+  window.C=t=>({c:"cmt",t});
+  window.H=t=>({c:"hl",t});
+  window.K=t=>({c:"ok",t});
+</script>
+
+<!-- case data. Swap this file to load a different set of hunts. window.CASES = {...} -->
+<script src="cases.js"></script>
+
+<!-- engine ------------------------------------------------------------------------- -->
+<script>
+const KIND_LABEL={evidence:"Evidence",deadend:"Dead end",pivot:"The pivot",win:"Progress",root:"Root cause",retro:"Retrospective"};
+const CASES = window.CASES || {};
+const CASE_IDS = Object.keys(CASES);
+const $=id=>document.getElementById(id);
+const stripHTML=h=>{const d=document.createElement("div");d.innerHTML=h;return d.textContent;};
+const esc=t=>String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const timeline=$("timeline"), svg=$("edges");
+
+if(!CASE_IDS.length){
+  document.querySelector("main").innerHTML='<div class="nomsg"><h2>No cases loaded.</h2>'+
+    '<p>This page expects a <code>cases.js</code> next to it that sets '+
+    '<code>window.CASES = {…}</code>. See <code>docs/authoring.md</code>.</p></div>';
+}else{
+  if(window.APP_TITLE) $("apptitle").textContent=window.APP_TITLE;
+  runEngine();
+}
+
+function runEngine(){
+let state={cid:CASE_IDS[0],cur:-1}, nodeEls=[], playing=false, timer=null, curUtter=null, audioEl=null;
+
+CASE_IDS.forEach(cid=>{
+  const b=document.createElement("button");
+  b.textContent=CASES[cid].name||cid; b.dataset.cid=cid;
+  b.onclick=()=>{ location.hash=cid+"-1"; };
+  $("cases").appendChild(b);
+});
+
+function buildTimeline(){
+  const cs=CASES[state.cid];
+  [...timeline.querySelectorAll(".node")].forEach(n=>n.remove());
+  nodeEls=cs.steps.map(s=>{
+    const n=document.createElement("div");
+    n.className="node kind-"+s.kind+(s.lane?" detour":"");
+    n.innerHTML='<span class="dot"></span><div class="card"><div class="k">'+KIND_LABEL[s.kind]+
+      '</div><div class="t">'+s.title+'</div>'+(s.tag?'<span class="tag">'+s.tag+'</span>':'')+'</div>';
+    timeline.appendChild(n);
+    return n;
+  });
+}
+function drawEdges(){
+  const cs=CASES[state.cid];
+  const w=timeline.scrollWidth, h=timeline.scrollHeight;
+  svg.setAttribute("width",w); svg.setAttribute("height",h); svg.setAttribute("viewBox","0 0 "+w+" "+h);
+  const tb=timeline.getBoundingClientRect();
+  const ctr=el=>{const r=el.getBoundingClientRect();
+    return {x:r.left-tb.left+timeline.scrollLeft+r.width/2, y:r.top-tb.top+timeline.scrollTop+r.height/2};};
+  const d=nodeEls.map(n=>ctr(n.querySelector(".dot")));
+  let out='<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">'+
+          '<path d="M0,0 L6,3 L0,6 Z" fill="var(--pivot)"/></marker></defs>';
+  (cs.edges||[]).forEach(e=>{
+    const a=d[e.f], b=d[e.t]; if(!a||!b) return; let path, extra="";
+    if(e.type==="seq"){ path="M "+a.x+" "+a.y+" L "+b.x+" "+b.y; }
+    else if(e.type==="branch"||e.type==="backtrack"){ const my=(a.y+b.y)/2;
+      path="M "+a.x+" "+a.y+" C "+a.x+" "+my+" "+b.x+" "+my+" "+b.x+" "+b.y;
+      if(e.type==="backtrack") extra=' marker-end="url(#arrow)"'; }
+    else { const y1=a.y+(b.y-a.y)*0.15, y2=a.y+(b.y-a.y)*0.85;
+      path="M "+a.x+" "+a.y+" C 8 "+y1+" 8 "+y2+" "+b.x+" "+b.y; }
+    const reveal = e.type==="shortcut" ? cs.steps.length-1 : e.t;
+    const kind = e.type==="shortcut" ? "retro" : cs.steps[e.t].kind;
+    out+='<path d="'+path+'" class="edge '+e.type+' k-'+kind+'" data-reveal="'+reveal+'"'+extra+'></path>';
+    if(e.type==="backtrack") out+='<text class="elabel back" x="'+((a.x+b.x)/2+8)+'" y="'+((a.y+b.y)/2-4)+'">backtrack</text>';
+    if(e.type==="shortcut")  out+='<text class="elabel short" x="14" y="'+((a.y+b.y)/2)+'">expert shortcut</text>';
+  });
+  svg.innerHTML=out; litEdges();
+}
+function litEdges(){ svg.querySelectorAll(".edge").forEach(p=>
+  p.classList.toggle("lit", state.cur >= +p.dataset.reveal)); }
+function renderCode(i){
+  const cs=CASES[state.cid], c=(cs.code||[])[i];
+  $("code").className="code kind-"+cs.steps[i].kind;
+  if(!c){ $("codelbl").textContent="—"; $("codecap").textContent="";
+    $("codebody").innerHTML='<span class="empty">(no code for this step)</span>'; return; }
+  $("codelbl").textContent=c.lang||""; $("codecap").textContent=c.cap||"";
+  $("codebody").innerHTML=(c.body||[]).map(l=> typeof l==="string"
+    ? '<span>'+esc(l||" ")+'</span>' : '<span class="'+l.c+'">'+esc(l.t||" ")+'</span>').join("");
+}
+function render(i){
+  const cs=CASES[state.cid], s=cs.steps[i]; state.cur=i;
+  nodeEls.forEach((n,j)=>{ n.classList.toggle("on",j<=i); n.classList.toggle("active",j===i); });
+  nodeEls[i].scrollIntoView({behavior:"smooth",block:"center"});
+  $("chapter").textContent=s.chapter||""; $("chapter").className="chapter kind-"+s.kind;
+  $("accent").className="accent kind-"+s.kind;
+  $("counter").textContent=(i+1)+" / "+cs.steps.length;
+  $("move").innerHTML = s.move ? "move · <b>"+s.move+"</b>" : "";
+  $("title").textContent=s.title; $("narr").innerHTML=s.narr;
+  renderCode(i); litEdges();
+  $("fill").style.width=((i+1)/cs.steps.length*100)+"%";
+}
+function clearTimers(){ if(timer){clearTimeout(timer);timer=null;}
+  if(audioEl){audioEl.pause();audioEl.onended=null;audioEl=null;}
+  if(window.speechSynthesis){window.speechSynthesis.cancel();} curUtter=null; }
+function fallbackTimer(){ const cs=CASES[state.cid];
+  const words=stripHTML(cs.steps[state.cur].narr).split(/\s+/).length;
+  timer=setTimeout(()=>{if(playing)next();}, Math.min(11000,Math.max(3200,words*330))*parseFloat($("speed").value)); }
+function advanceAfter(){
+  if(!playing) return;
+  const cs=CASES[state.cid];
+  if(state.cur>=cs.steps.length-1){ setPlaying(false); return; }
+  const wantSpeak=$("speak").checked, clip=cs.audio&&cs.audio[state.cur];
+  if(wantSpeak && clip){
+    audioEl=new Audio(clip); audioEl.playbackRate=1/parseFloat($("speed").value);
+    audioEl.onended=()=>{if(playing)next();}; audioEl.play().catch(fallbackTimer);
+  } else if(wantSpeak && "speechSynthesis" in window){
+    const u=new SpeechSynthesisUtterance(stripHTML(cs.steps[state.cur].narr));
+    u.rate=0.98/parseFloat($("speed").value); u.onend=()=>{if(playing)next();};
+    curUtter=u; window.speechSynthesis.speak(u);
+  } else fallbackTimer();
+}
+function go(i){ const cs=CASES[state.cid]; clearTimers();
+  render(Math.max(0,Math.min(cs.steps.length-1,i))); if(playing) advanceAfter(); }
+function next(){ go(state.cur+1); } function prev(){ go(state.cur-1); }
+function setPlaying(p){ playing=p; $("play").textContent=p?"⏸ Pause":"▶ Play";
+  if(p){ if(state.cur>=CASES[state.cid].steps.length-1) render(0); advanceAfter(); } else clearTimers(); }
+function switchCase(cid){
+  setPlaying(false); state.cid=cid; state.cur=-1;
+  $("subtitle").textContent=CASES[cid].sub||"";
+  [...$("cases").children].forEach(b=>b.classList.toggle("on",b.dataset.cid===cid));
+  buildTimeline(); render(0);
+  requestAnimationFrame(()=>requestAnimationFrame(drawEdges));
+}
+$("play").onclick=()=>setPlaying(!playing);
+$("next").onclick=()=>{if(playing)setPlaying(false);next();};
+$("prev").onclick=()=>{if(playing)setPlaying(false);prev();};
+$("restart").onclick=()=>{setPlaying(false);go(0);};
+$("speak").onchange=()=>{ if(playing){clearTimers();advanceAfter();} };
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="SELECT")return;
+  if(e.code==="Space"){e.preventDefault();setPlaying(!playing);}
+  else if(e.code==="ArrowRight"){if(playing)setPlaying(false);next();}
+  else if(e.code==="ArrowLeft"){if(playing)setPlaying(false);prev();}
+  else if(e.key==="r"||e.key==="R"){setPlaying(false);go(0);}
+});
+let rt; window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(drawEdges,150);});
+function parseHash(){ const m=(location.hash||"").slice(1).split("-");
+  const cid=CASES[m[0]]?m[0]:CASE_IDS[0]; const n=parseInt(m[1]); const cs=CASES[cid];
+  return {cid, step:(n>=1&&n<=cs.steps.length)?n-1:0}; }
+function applyHash(){ const h=parseHash();
+  if(h.cid!==state.cid || state.cur<0) switchCase(h.cid);
+  requestAnimationFrame(()=>go(h.step)); }
+window.addEventListener("hashchange",applyHash);
+applyHash();
+}
+</script>
+</body>
+</html>

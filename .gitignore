@@ -1,0 +1,7 @@
+.DS_Store
+dist/
+*.venv/
+.tts-venv/
+voices/
+node_modules/
+*.log
